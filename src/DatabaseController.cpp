@@ -1,5 +1,4 @@
 ﻿#include "DatabaseController.h"
-#include "QThread"
 
 DatabaseController::DatabaseController(QObject* parent) : QObject(parent) {
     qDebug() << "DatabaseController olustu.";
@@ -20,7 +19,7 @@ bool DatabaseController::openDatabase(const QString& dbName) {
     }
 
     if (!db.open()) {
-        qDebug() << "veritabani acma hatasi:" << db.lastError().text();
+        qDebug() << "Veritabani acma hatasi:" << db.lastError().text();
         return false;
     }
 
@@ -31,74 +30,71 @@ bool DatabaseController::openDatabase(const QString& dbName) {
 void DatabaseController::closeDatabase() {
     if (db.isOpen()) {
         db.close();
-        qDebug() << "Veritabani kapatildi.";
+        qDebug() << "veritabani kapatildi.";
     }
 }
 
 bool DatabaseController::executeQuery(const QString& queryStr) {
     if (!db.isOpen()) {
-        qDebug() << "Hata: Veritabani acik degil!";
+        qDebug() << "Hata: Veritabani acik degil.";
         return false;
     }
 
     QSqlQuery query(db);
     if (!query.exec(queryStr)) {
-        qDebug() << "SQL Hatasi: " << query.lastError().text();
+        qDebug() << "SQL hatasi: " << query.lastError().text();
         return false;
     }
 
-    qDebug() << "SQL sorgusu basariyla calistirildi: " << queryStr;
+    qDebug() << "SQL sorgusu basariyla calistirildi.executeQuery: " << queryStr;
     return true;
 }
 
-bool DatabaseController::createTable() {
-    QString sql = "CREATE TABLE IF NOT EXISTS Users ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "name TEXT NOT NULL, "
-        "age INTEGER)";
-    return executeQuery(sql);
-}
+bool DatabaseController::insert_data(const QString& tableName, const QMap<QString, QString>& data) {
+    if (!db.isOpen()) return false;
 
-bool DatabaseController::insertData(const QString& name, int age, int id) {
-
-    qInfo("inserdata_thread = %p", QThread::currentThreadId());
-    QThread::sleep(15); // 2 saniye uyku
-    QString sql = QString("INSERT INTO Users (name, age, id) VALUES ('%1', %2, %3)")
-        .arg(name)
-        .arg(age)
-        .arg(id);
-    return executeQuery(sql);
-}
-
-QVariantList DatabaseController::getAllUsers() {
-    QVariantList users;
-    if (!db.isOpen()) {
-        qDebug() << "veritabani acik degil.get_all_user";
-        return users;
+    QThread::sleep(10);                                                                                                         // 10 saniye uyku
+    QStringList columns = data.keys();
+    QStringList values;
+    for (const QString& key : columns) {
+        values.append("'" + data.value(key) + "'");
     }
 
-    QSqlQuery query("SELECT id, name, age FROM Users", db);
-    while (query.next()) {
-        QVariantMap user;
-        user["id"] = query.value(0);
-        user["name"] = query.value(1);
-        user["age"] = query.value(2);
-        users.append(user);
+    QString sql = QString("INSERT INTO %1 (%2) VALUES (%3)")
+        .arg(tableName)
+        .arg(columns.join(", "))
+        .arg(values.join(", "));
+
+    return executeQuery(sql);
+}
+
+bool DatabaseController::update_user(const QString& tableName, int id, const QMap<QString, QString>& data) {
+    if (!db.isOpen()) return false;
+
+    QStringList updateStatements;
+    for (auto it = data.begin(); it != data.end(); ++it) {
+        updateStatements.append(QString("%1='%2'").arg(it.key()).arg(it.value()));
     }
 
-    return users;
-}
-
-bool DatabaseController::updateUser(int id, const QString& name, int age) {
-    qInfo("update_thread = %p", QThread::currentThreadId());
-    QString sql = QString("UPDATE Users SET name='%1', age=%2 WHERE id=%3")
-        .arg(name)
-        .arg(age)
+    QString sql = QString("UPDATE %1 SET %2 WHERE id=%3")
+        .arg(tableName)
+        .arg(updateStatements.join(", "))
         .arg(id);
+
     return executeQuery(sql);
 }
 
-bool DatabaseController::deleteUser(int id) {
-    QString sql = QString("DELETE FROM Users WHERE id=%1").arg(id);
+bool DatabaseController::delete_user(const QString& tableName, int id) {
+    if (!db.isOpen()) return false;
+
+    QString sql = QString("DELETE FROM %1 WHERE id=%2")
+        .arg(tableName)
+        .arg(id);
+
     return executeQuery(sql);
+}
+
+
+QSqlDatabase& DatabaseController::getDatabase() {
+    return db;
 }
